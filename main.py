@@ -1,24 +1,20 @@
 import flet as ft
+import os
+from pathlib import Path
+
+# percorso della cartella principale
+BASE_DIR = Path(__file__).parent / "EZNotes_Data"
+BASE_DIR.mkdir(exist_ok=True)
 
 def main(page: ft.Page):
     page.title = "I miei Appunti (Flet)"
     page.theme_mode = ft.ThemeMode.DARK
     
-    # dati di test
-    vaults_data = {
-        "Sistemi Operativi": [
-            {"title": "01_Introduzione", "content": "# Introduzione\nI sistemi operativi gestiscono l'hardware."},
-            {"title": "02_Processi_e_ID", "content": "# ID e Processi\nOgni processo ha un RUID, EUID e SSUID."},
-        ],
-        "Progetti Personali": [
-            {"title": "Idea_App_Flet", "content": "# Appunti di sviluppo\nSviluppare l'app di note in Python usando Flet."}
-        ]
-    }
+    vaults_data = {}  # dizionario dinamico
 
     current_vault = ""
     is_editing = False 
     
-    # variabili per controllare se mostrare o nascondere la barra di inserimento in cima
     show_vault_adder = False
     show_note_adder = False
 
@@ -26,24 +22,55 @@ def main(page: ft.Page):
     note_input_field = ft.TextField(label="Titolo della nuova Nota", expand=True, text_size=14)
 
 
+    # FUNZIONI DI LETTURA E SCRITTURA SU DISCO
+    def carica_dati_da_disco():
+        vaults_data.clear()
+        # Scansione directory principale per trovare i Vault 
+        for item in BASE_DIR.iterdir():
+            if item.is_dir():
+                vault_name = item.name
+                vaults_data[vault_name] = []
+                
+                # Scansione sottocartelle per trovare le Note (file .md)
+                for file in item.glob("*.md"):
+                    if file.is_file():
+                        with open(file, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        vaults_data[vault_name].append({
+                            "title": file.stem, 
+                            "content": content
+                        })
+
+    carica_dati_da_disco()     # Caricamento iniziale dei file
+
+
     # FUNZIONI DI LOGICA
     def add_vault_confirm(e):
         nonlocal show_vault_adder
         name = vault_input_field.value.strip()
         if name:
-            if name not in vaults_data:
-                vaults_data[name] = []
+            # Creazione cartella fisica sul disco
+            new_vault_path = BASE_DIR / name
+            new_vault_path.mkdir(exist_ok=True)
+            
             vault_input_field.value = ""
             show_vault_adder = False
+            carica_dati_da_disco()
             render_views()
 
     def add_note_confirm(e):
         nonlocal show_note_adder
         title = note_input_field.value.strip()
         if title:
-            vaults_data[current_vault].append({"title": title, "content": f"# {title}\nInizia a scrivere qui..."})
+            # Creazione file .md vuoto sul disco
+            note_path = BASE_DIR / current_vault / f"{title}.md"
+            default_content = f"# {title}\nInizia a scrivere qui..."
+            with open(note_path, "w", encoding="utf-8") as f:
+                f.write(default_content)
+                
             note_input_field.value = ""
             show_note_adder = False
+            carica_dati_da_disco()
             render_views()
 
     def toggle_vault_adder(e):
@@ -92,7 +119,6 @@ def main(page: ft.Page):
                     route="/",
                     controls=[
                         ft.AppBar(title=ft.Text("I miei Vault"), bgcolor=ft.Colors.SURFACE_CONTAINER_HIGHEST),
-                        # CORREZIONE: Sostituito ft.padding.only con ft.Padding(left, top, right, bottom)
                         ft.Container(content=adder_row, padding=ft.Padding(20, 15, 20, 0)),
                         ft.ListView(controls=vault_buttons, expand=True, spacing=10, padding=20)
                     ],
@@ -170,6 +196,12 @@ def main(page: ft.Page):
             def save_note(e):
                 nonlocal is_editing
                 note["content"] = edit_field.value 
+                
+                # Salvataggio fisico del testo modificato nel file .md
+                note_path = BASE_DIR / current_vault / f"{note['title']}.md"
+                with open(note_path, "w", encoding="utf-8") as f:
+                    f.write(edit_field.value)
+                
                 is_editing = False
                 render_views()
 

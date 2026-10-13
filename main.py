@@ -3,13 +3,25 @@ import os
 import shutil
 from pathlib import Path
 
-# Percorso della cartella principale
-BASE_DIR = Path(__file__).parent / "EZNotes_Data"
+FLET_PLATFORM = os.getenv("FLET_PLATFORM", "desktop")
+
+if FLET_PLATFORM in ["android", "ios"]:
+    # Su mobile chiediamo la cartella dei documenti protetta riservata all'app
+    BASE_DIR = Path(os.environ.get("HOME", ".")) / "EZNotes_Data"
+else:
+    # Su PC mantiene la cartella locale di prima
+    BASE_DIR = Path(__file__).parent / "EZNotes_Data"
+
 BASE_DIR.mkdir(exist_ok=True)
 
 def main(page: ft.Page):
     page.title = "I miei Appunti (Flet)"
     page.theme_mode = ft.ThemeMode.DARK
+    
+    # FORZATURA FORMATO CELLULARE SU DESKTOP
+    page.window_width = 390
+    page.window_height = 844
+    page.window_resizable = False
     
     vaults_data = {}  # dizionario dinamico 
 
